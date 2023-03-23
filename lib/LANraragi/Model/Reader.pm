@@ -17,6 +17,7 @@ use Image::Magick;
 use LANraragi::Utils::Generic qw(is_image shasum);
 use LANraragi::Utils::Archive qw(extract_archive get_filelist);
 use LANraragi::Utils::Database qw(redis_decode);
+use LANraragi::Utils::TempFolder qw(get_temp);
 
 # resize_image(image,quality, size_threshold)
 # Convert an image to a cheaper on bandwidth format through ImageMagick.
@@ -65,12 +66,56 @@ sub build_reader_JSON {
     my $redis = LANraragi::Model::Config->get_redis;
     my $archive = $redis->hget( $id, "file" );
 
-    # Parse archive to get its list of images
-    my ( $images, $sizes ) = get_filelist($archive);
+    my $tempdir = get_temp();
+    my $archive_extract_dir = $tempdir . "/" . $id;
 
-    # Dereference arrays
-    my @images = @$images;
-    my @sizes  = @$sizes;
+    if ( -e $archive_extract_dir && $force eq "1" ) {
+
+        #If the file has been extracted and force-reload=1,
+        #we wipe the extraction directory.
+        remove_tree($archive_extract_dir);
+    }
+
+    # Get the path from Redis.
+    # Filenames are stored as they are on the OS, so no decoding!
+    my $zipfile = $redis->hget( $id, "file" );
+
+    #Now, has our file been extracted to the temporary directory recently?
+    #If it hasn't, we call libarchive to do it.
+    #If the file hasn't been extracted, or if force-reload =1
+    unless ( -e $archive_extract_dir ) {
+
+        my $outpath = "";
+        eval { $outpath = extract_archive( $zipfile, $archive_extract_dir ); };
+
+        if ($@) {
+            my $log = $@;
+            $self->LRR_LOGGER->error("Error extracting archive : $log");
+            die $log;
+        } else {
+            $self->LRR_LOGGER->debug("Extraction of archive to $outpath done");
+            $archive_extract_dir = $outpath;
+        }
+
+    }
+
+    #Find the extracted images with a full search (subdirectories included),
+    #treat them and jam them into an array.
+    my @images;
+    eval {
+        find(
+            sub {
+                # Is it an image?
+                if ( is_image($_) ) {
+                    # push @images, $File::Find::name;
+                    my $image_path = $File::Find::name;
+                    $image_path =~ s(${archive_extract_dir}/(.+)$)(\1)i;
+                    push @images, $image_path;
+                }
+            },
+            $archive_extract_dir
+        );
+    };
 
     $self->LRR_LOGGER->debug( "Files found in archive (encoding might be incorrect): \n " . Dumper @images );
 
@@ -95,9 +140,6 @@ sub build_reader_JSON {
         push @images_browser, "./api/archives/$id/page?path=$imgpath";
     }
 
-    # Update pagecount and sizes
-    $redis->hset( $id, "pagecount", scalar @images );
-    $redis->hset( $id, "filesizes", encode_json( \@sizes ) );
     $redis->quit();
 
     return {
