@@ -138,11 +138,11 @@ sub update_filemap {
     $logger->info( "Found " . scalar @newfiles . " new files." );
     $logger->info( scalar @deletedfiles . " files were found on the filemap but not on the filesystem." );
 
-    # Delete old files from filemap
-    foreach my $deletedfile (@deletedfiles) {
-        $logger->debug("Removing $deletedfile from filemap.");
-        $redis->hdel( "LRR_FILEMAP", $deletedfile ) || $logger->warn("Couldn't delete previous filemap data.");
-    }
+    # # Delete old files from filemap
+    # foreach my $deletedfile (@deletedfiles) {
+    #     $logger->debug("Removing $deletedfile from filemap.");
+    #     $redis->hdel( "LRR_FILEMAP", $deletedfile ) || $logger->warn("Couldn't delete previous filemap data.");
+    # }
 
     $redis->quit();
 
