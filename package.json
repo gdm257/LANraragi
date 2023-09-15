@@ -1,7 +1,7 @@
 {
     "name": "lanraragi",
-    "version": "0.8.90",
-    "version_name": "The Hearts Filthy Lesson",
+    "version": "0.9.0",
+    "version_name": "Hallo Spaceboy",
     "description": "I'm under Japanese influence and my honor's at stake!",
     "scripts": {
         "test": "prove -r -l -v tests/",
@@ -14,7 +14,7 @@
         "docker-build": "docker build -t gdm257/lanraragi -f ./tools/build/docker/Dockerfile .",
         "critic": "perlcritic ./lib/* ./script/* ./tools/install.pl",
         "backup-db": "perl ./script/backup",
-        "get-version": "perl -Mojo -E \"my \\$conf = j(f(qw(package.json))->slurp); say %\\$conf{version} .q/ - '/. %\\$conf{version_name} .q/'/ \""
+        "get-version": "perl ./script/get_version"
     },
     "repository": {
         "type": "git",
